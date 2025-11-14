@@ -1,0 +1,5 @@
+panda-gym
+stable-baselines3[extra]
+gymnasium
+rl-zoo3
+
