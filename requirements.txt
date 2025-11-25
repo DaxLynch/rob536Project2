@@ -2,4 +2,8 @@ panda-gym
 stable-baselines3[extra]
 gymnasium
 rl-zoo3
+matplotlib
+pandas
+tensorboard
+sbx-rl  # Stable-Baselines-Jax for faster training
 

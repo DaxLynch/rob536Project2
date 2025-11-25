@@ -8,7 +8,7 @@ import os
 from datetime import datetime
 import gymnasium as gym
 import panda_gym
-from sb3_contrib import TQC
+from sbx import TQC  # Using SBX (Stable-Baselines-Jax) for faster training
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.callbacks import (
     CheckpointCallback,
@@ -21,7 +21,7 @@ from stable_baselines3.common.monitor import Monitor
 # Configuration
 # ============================================================================
 ENV_NAME = "PandaReach-v3"
-ALGO_NAME = "tqc"
+ALGO_NAME = "tqc_sbx"  # Using SBX (Jax-based) implementation
 N_ENVS = 16  # Number of parallel environments
 TOTAL_TIMESTEPS = 1_000_000
 EVAL_FREQ = 10_000  # Evaluate every N steps (per environment)
