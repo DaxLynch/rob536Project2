@@ -1,5 +1,6 @@
 import gymnasium as gym
 import panda_gym
+from datetime import datetime
 from stable_baselines3 import SAC
 from stable_baselines3.common.vec_env import (
         DummyVecEnv,
@@ -27,11 +28,13 @@ base_env.norm_reward = False   # recommended for HER tasks
 video_folder = "./videos/"
 video_length = 2000
 
+timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
 eval_env = VecVideoRecorder(
     base_env,
     video_folder,
     record_video_trigger=lambda step: step % 100000 == 0,
-    name_prefix="sac_panda_eval",
+    name_prefix=f"sac_panda_{timestamp}",
     video_length=video_length,
 )
 
