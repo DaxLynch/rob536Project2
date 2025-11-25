@@ -7,4 +7,4 @@ pandas
 tensorboard
 sb3-contrib
 sbx-rl  # Optional: Only needed for trainSBX.py (Jax-based, faster but limited logging)
-tfp-nightly                          0.26.0.dev20251124
+tfp-nightly          

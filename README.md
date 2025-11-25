@@ -1,5 +1,7 @@
 # Panda-Gym with Stable-Baselines3 and RL Baselines3 Zoo
 
+tensorboard --logdir ./tb to view with the new stuff
+
 This project uses panda-gym environments with stable-baselines3 and RL Baselines3 Zoo for reinforcement learning.
 
 ## Overview
