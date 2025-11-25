@@ -187,7 +187,7 @@ def evaluate_at_fixed_frictions(model, friction_values: list,
         results['std_rewards'].append(std_reward)
         results['mean_lengths'].append(mean_length)
         
-        print(f"Friction={friction:.2f}: Success Rate={success_rate:.1f}%, "
+        print(f"Friction={friction:.3f}: Success Rate={success_rate:.1f}%, "
               f"Mean Reward={mean_reward:.2f} ± {std_reward:.2f}")
     
     return results
@@ -291,7 +291,7 @@ def main():
     if args.mode in ['fixed', 'both']:
         print("\n--- Fixed Friction Evaluation ---\n")
         # Test at specific friction values
-        friction_values = [0.1, 0.3, 0.5, 0.7, 1.0, 1.5, 2.0]
+        friction_values = [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]#1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0]
         fixed_results = evaluate_at_fixed_frictions(
             model, friction_values, 
             n_episodes_per_friction=20, render=args.render,
@@ -301,7 +301,7 @@ def main():
         print(f"\n{'='*40}")
         print("Fixed Friction Summary:")
         for i, f in enumerate(fixed_results['friction_levels']):
-            print(f"  Friction {f:.1f}: {fixed_results['success_rates'][i]:.1f}% success")
+            print(f"  Friction {f:.3f}: {fixed_results['success_rates'][i]:.1f}% success")
         print(f"{'='*40}")
         
         output_path = os.path.join(args.output_dir, f"fixed_friction_{timestamp}.csv")

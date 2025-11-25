@@ -43,7 +43,7 @@ class PickAndPlaceWithFriction(Task):
         goal_xy_range: float = 0.3,
         goal_z_range: float = 0.2,
         obj_xy_range: float = 0.3,
-        friction_range: tuple = (0.1, 2.0),
+        friction_range: tuple = (0.05, 2.0),
         randomize_friction: bool = True,
     ) -> None:
         super().__init__(sim)
