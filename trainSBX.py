@@ -10,32 +10,37 @@ import gymnasium as gym
 import panda_gym
 from sbx import TQC  # Using SBX (Stable-Baselines-Jax) for faster training
 from stable_baselines3.common.env_util import make_vec_env
+from stable_baselines3 import HerReplayBuffer
+
 from stable_baselines3.common.callbacks import (
     CheckpointCallback,
     EvalCallback,
     CallbackList,
 )
 from stable_baselines3.common.monitor import Monitor
+from friction_wrapper import FrictionWrapper
 
 # ============================================================================
 # Configuration
 # ============================================================================
-ENV_NAME = "PandaReach-v3"
+ENV_NAME = "PandaPickAndPlace-v3"
+USE_FRICTION = False  # Set to True to train with varying friction
 ALGO_NAME = "tqc_sbx"  # Using SBX (Jax-based) implementation
-N_ENVS = 16  # Number of parallel environments
-TOTAL_TIMESTEPS = 1_000_000
+N_ENVS = 24  # Number of parallel environments
+TOTAL_TIMESTEPS = 5_000_000
 EVAL_FREQ = 10_000  # Evaluate every N steps (per environment)
 SAVE_FREQ = 50_000  # Save checkpoint every N steps
 N_EVAL_EPISODES = 10  # Number of episodes for evaluation
 
 # Create timestamped log directory
-exp_name = None
+exp_name = "UsingTunedHyperParams3MSteps"
 log_dir = None
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 if exp_name is not None:
     log_dir = f"./logs/{ALGO_NAME}/{ENV_NAME}_{exp_name}_{timestamp}"
 else:
     log_dir = f"./logs/{ALGO_NAME}/{ENV_NAME}_{timestamp}"
+print(log_dir)
 tensorboard_log = f"./logs/{ALGO_NAME}_tensorboard"
 os.makedirs(log_dir, exist_ok=True)
 
@@ -43,6 +48,7 @@ print("=" * 80)
 print(f"Training Configuration:")
 print(f"  Environment: {ENV_NAME}")
 print(f"  Algorithm: {ALGO_NAME.upper()}")
+print(f"  Varying Friction: {USE_FRICTION}")
 print(f"  Parallel Environments: {N_ENVS}")
 print(f"  Total Timesteps: {TOTAL_TIMESTEPS:,}")
 print(f"  Log Directory: {log_dir}")
@@ -57,6 +63,7 @@ env = make_vec_env(
     ENV_NAME,
     n_envs=N_ENVS,
     monitor_dir=log_dir,  # Automatically wraps with Monitor
+    wrapper_class=FrictionWrapper if USE_FRICTION else None,
 )
 
 # Separate evaluation environment
@@ -64,6 +71,7 @@ eval_env = make_vec_env(
     ENV_NAME,
     n_envs=1,
     monitor_dir=f"{log_dir}/eval",
+    wrapper_class=FrictionWrapper if USE_FRICTION else None,
 )
 
 # ============================================================================
@@ -97,12 +105,23 @@ callbacks = CallbackList([checkpoint_callback, eval_callback])
 # Create and Train Model
 # ============================================================================
 # Create the TQC model with tensorboard logging
+# And update the model creation section (around lines 100-106):
 model = TQC(
     policy="MultiInputPolicy",
     env=env,
+    learning_rate=0.001,
+    buffer_size=1_000_000,
+    batch_size=2048*2,
+    gamma=0.95,
+    tau=0.05,
+    train_freq=16,
+    gradient_steps=16,
+    replay_buffer_class=HerReplayBuffer,
+    replay_buffer_kwargs=dict(goal_selection_strategy='future', n_sampled_goal=4),
+    policy_kwargs=dict(net_arch=[512, 512, 512], n_critics=2),
     verbose=1,
     tensorboard_log=tensorboard_log,
-    device="auto",  # Automatically use GPU if available
+    device="cuda",
 )
 
 # Train the agent

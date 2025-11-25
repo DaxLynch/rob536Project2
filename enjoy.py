@@ -1,17 +1,22 @@
-"""
-Visualize a trained agent using stable-baselines3.
-
-This script loads a trained model and displays the agent's behavior in the environment.
-"""
+"""Visualize a trained agent."""
 import gymnasium as gym
 import panda_gym
 from sbx import TQC
 import time
 
-# Load the trained model
-model_path = "./logs/tqc_sbx/PandaReach-v3_20251124_173555/best_model/best_model"
-print(f"Loading model from {model_path}...")
-env = gym.make("PandaReach-v3", render_mode="human", renderer="OpenGL")
+# ===== CHANGE THIS FLAG =====
+USE_PICK_AND_PLACE = True  # False = PandaReach, True = PandaPickAndPlace
+# ============================
+
+if USE_PICK_AND_PLACE:
+    env_id = "PandaPickAndPlace-v3"
+    model_path = "/home/dax/Code/ROB537/group_project/logs/tqc_sbx/PandaPickAndPlace-v3_UsingTunedHyperParams3MSteps_20251125_022727/best_model/best_model"
+else:
+    env_id = "PandaReach-v3"
+    model_path = "./logs/tqc_sbx/PandaReach-v3_20251124_173555/best_model/best_model"
+
+print(f"Loading {env_id}...")
+env = gym.make(env_id, render_mode="human", renderer="OpenGL")
 model = TQC.load(model_path, env=env)
 
 # Create the environment with rendering enabled

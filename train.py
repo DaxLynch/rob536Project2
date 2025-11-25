@@ -22,7 +22,7 @@ from stable_baselines3.common.monitor import Monitor
 # ============================================================================
 ENV_NAME = "PandaReach-v3"
 ALGO_NAME = "tqc"
-N_ENVS = 16  # Number of parallel environments
+N_ENVS = 24  # Number of parallel environments
 TOTAL_TIMESTEPS = 1_000_000
 EVAL_FREQ = 10_000  # Evaluate every N steps (per environment)
 SAVE_FREQ = 50_000  # Save checkpoint every N steps
