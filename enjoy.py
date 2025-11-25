@@ -13,7 +13,7 @@ if USE_PICK_AND_PLACE:
     model_path = "best_models/pick_and_place_end_effector_mode_std_friction"
 else:
     env_id = "PandaReach-v3"
-    model_path = "./logs/tqc_sbx/PandaReach-v3_20251124_173555/best_model/best_model"
+    model_path = "best_models/panda_reach_end_effector_std_friction"
 
 print(f"Loading {env_id}...")
 env = gym.make(env_id, render_mode="human", renderer="OpenGL")
@@ -37,7 +37,7 @@ try:
         # Step the environment
         obs, reward, terminated, truncated, info = env.step(action)
         total_reward += reward
-        time.sleep(1.0/12.0)
+        time.sleep(1.0/24.0)
         # Reset if episode is done
         if terminated or truncated:
             episode_count += 1

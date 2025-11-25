@@ -108,7 +108,7 @@ logs/
 **Monitor Training in Real-Time:**
 ```bash
 # In a separate terminal, run tensorboard
-tensorboard --logdir ./logs/tqc_tensorboard
+tensorboard --logdir ./logs/tqc_sbx_tensorboard
 # Then open http://localhost:6006 in your browser
 ```
 

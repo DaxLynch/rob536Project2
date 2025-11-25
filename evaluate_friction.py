@@ -1,8 +1,12 @@
 """
 Evaluate a trained model's performance across varying friction levels.
 
-This script tests how well a model (trained on standard friction) performs
-when the target object has different friction coefficients.
+This script tests how well a model performs when the target object has 
+different friction coefficients.
+
+Supports both:
+- Models trained on FrictionPickAndPlace-v1 (20-dim obs with friction)
+- Models trained on PandaPickAndPlace-v3 (19-dim obs, no friction)
 
 Usage:
     python evaluate_friction.py --model path/to/model.zip
@@ -12,28 +16,41 @@ import argparse
 import csv
 import os
 from datetime import datetime
-
+import time
 import gymnasium as gym
 import numpy as np
 import panda_gym
 from sbx import TQC
 
-from friction_wrapper import FrictionWrapper, FixedFrictionWrapper
+# Import to register native friction environments
+import friction_env
 
 
-def evaluate_with_random_friction(model, env_name: str, n_episodes: int = 100, 
-                                   render: bool = False) -> dict:
+def evaluate_with_random_friction(model, n_episodes: int = 100, 
+                                   render: bool = False,
+                                   use_friction_env: bool = True) -> dict:
     """
     Evaluate model with random friction each episode.
+    
+    Args:
+        model: Trained model
+        n_episodes: Number of episodes to run
+        render: Whether to render
+        use_friction_env: If True, use FrictionPickAndPlace-v1 (for friction-aware models)
+                         If False, use PandaPickAndPlace-v3 and manually set friction
     
     Returns:
         Dictionary with results including success rate, rewards, and friction values
     """
+    if use_friction_env:
+        env_name = "FrictionPickAndPlace-v1"
+    else:
+        env_name = "PandaPickAndPlace-v3"
+    
     if render:
-        env = gym.make(env_name, render_mode="human")
+        env = gym.make(env_name, render_mode="human", renderer="OpenGL")
     else:
         env = gym.make(env_name)
-    env = FrictionWrapper(env)
     
     results = {
         'episodes': [],
@@ -45,24 +62,25 @@ def evaluate_with_random_friction(model, env_name: str, n_episodes: int = 100,
     
     for ep in range(n_episodes):
         obs, info = env.reset()
-        friction = info.get('friction', 0.5)
+        
+        # Set/get friction depending on env type
+        if use_friction_env:
+            friction = obs['observation'][-1]
+        else:
+            # Manually set random friction for standard env
+            friction = np.random.uniform(0.1, 2.0)
+            env.unwrapped.sim.set_lateral_friction('object', -1, friction)
         
         total_reward = 0
         done = False
         length = 0
         
         while not done:
-            # Handle observation format for models trained without friction
-            if 'friction' in obs and not hasattr(model, '_friction_aware'):
-                # Model was trained without friction observation
-                # Remove friction from obs for prediction
-                obs_for_model = {k: v for k, v in obs.items() if k != 'friction'}
-            else:
-                obs_for_model = obs
-            
-            action, _ = model.predict(obs_for_model, deterministic=True)
+            action, _ = model.predict(obs, deterministic=True)
             obs, reward, terminated, truncated, info = env.step(action)
             total_reward += reward
+            if render:
+                time.sleep(1.0/12.0)
             length += 1
             done = terminated or truncated
         
@@ -81,11 +99,20 @@ def evaluate_with_random_friction(model, env_name: str, n_episodes: int = 100,
     return results
 
 
-def evaluate_at_fixed_frictions(model, env_name: str, friction_values: list,
+def evaluate_at_fixed_frictions(model, friction_values: list,
                                  n_episodes_per_friction: int = 20,
-                                 render: bool = False) -> dict:
+                                 render: bool = False,
+                                 use_friction_env: bool = True) -> dict:
     """
     Evaluate model at specific friction values.
+    
+    Args:
+        model: Trained model
+        friction_values: List of friction values to test
+        n_episodes_per_friction: Episodes per friction level
+        render: Whether to render
+        use_friction_env: If True, use FrictionPickAndPlace-v1 (for friction-aware models)
+                         If False, use PandaPickAndPlace-v3 and manually set friction
     
     Returns:
         Dictionary with results grouped by friction level
@@ -100,11 +127,24 @@ def evaluate_at_fixed_frictions(model, env_name: str, friction_values: list,
     }
     
     for friction in friction_values:
-        if render:
-            env = gym.make(env_name, render_mode="human")
+        if use_friction_env:
+            # Use native friction env with fixed friction
+            if render:
+                env = gym.make("FrictionPickAndPlace-v1", 
+                              render_mode="human", 
+                              renderer="OpenGL",
+                              friction_range=(friction, friction),
+                              randomize_friction=False)
+            else:
+                env = gym.make("FrictionPickAndPlace-v1",
+                              friction_range=(friction, friction),
+                              randomize_friction=False)
         else:
-            env = gym.make(env_name)
-        env = FixedFrictionWrapper(env, friction=friction)
+            # Use standard env, will manually set friction
+            if render:
+                env = gym.make("PandaPickAndPlace-v3", render_mode="human", renderer="OpenGL")
+            else:
+                env = gym.make("PandaPickAndPlace-v3")
         
         rewards = []
         successes = []
@@ -112,20 +152,21 @@ def evaluate_at_fixed_frictions(model, env_name: str, friction_values: list,
         
         for ep in range(n_episodes_per_friction):
             obs, info = env.reset()
+            
+            # Manually set friction for standard env
+            if not use_friction_env:
+                env.unwrapped.sim.set_lateral_friction('object', -1, friction)
+            
             total_reward = 0
             done = False
             length = 0
             
             while not done:
-                # Handle observation format for models trained without friction
-                if 'friction' in obs:
-                    obs_for_model = {k: v for k, v in obs.items() if k != 'friction'}
-                else:
-                    obs_for_model = obs
-                
-                action, _ = model.predict(obs_for_model, deterministic=True)
+                action, _ = model.predict(obs, deterministic=True)
                 obs, reward, terminated, truncated, info = env.step(action)
                 total_reward += reward
+                if render:
+                    time.sleep(1.0/12.0)
                 length += 1
                 done = terminated or truncated
             
@@ -187,8 +228,6 @@ def main():
     parser = argparse.ArgumentParser(description='Evaluate model with varying friction')
     parser.add_argument('--model', type=str, required=True,
                         help='Path to trained model (.zip file)')
-    parser.add_argument('--env', type=str, default='PandaPickAndPlace-v3',
-                        help='Environment name (default: PandaPickAndPlace-v3)')
     parser.add_argument('--episodes', type=int, default=100,
                         help='Number of evaluation episodes (default: 100)')
     parser.add_argument('--render', action='store_true',
@@ -200,9 +239,25 @@ def main():
     
     args = parser.parse_args()
     
-    # Load model
+    # Detect model type by trying to load with each env type
     print(f"Loading model from: {args.model}")
-    model = TQC.load(args.model)
+    
+    # First try FrictionPickAndPlace-v1 (20-dim obs)
+    try:
+        temp_env = gym.make("FrictionPickAndPlace-v1")
+        model = TQC.load(args.model, env=temp_env)
+        temp_env.close()
+        use_friction_env = True
+        env_name = "FrictionPickAndPlace-v1"
+        print("  Model type: Friction-aware (20-dim observation)")
+    except ValueError:
+        # Fall back to PandaPickAndPlace-v3 (19-dim obs)
+        temp_env = gym.make("PandaPickAndPlace-v3")
+        model = TQC.load(args.model, env=temp_env)
+        temp_env.close()
+        use_friction_env = False
+        env_name = "PandaPickAndPlace-v3"
+        print("  Model type: Standard (19-dim observation, friction NOT in obs)")
     
     # Create output directory
     os.makedirs(args.output_dir, exist_ok=True)
@@ -211,14 +266,14 @@ def main():
     print(f"\n{'='*60}")
     print(f"Friction Evaluation")
     print(f"  Model: {args.model}")
-    print(f"  Environment: {args.env}")
+    print(f"  Environment: {env_name}")
     print(f"  Mode: {args.mode}")
     print(f"{'='*60}\n")
     
     if args.mode in ['random', 'both']:
         print("\n--- Random Friction Evaluation ---\n")
         random_results = evaluate_with_random_friction(
-            model, args.env, args.episodes, args.render
+            model, args.episodes, args.render, use_friction_env
         )
         
         # Summary
@@ -238,8 +293,9 @@ def main():
         # Test at specific friction values
         friction_values = [0.1, 0.3, 0.5, 0.7, 1.0, 1.5, 2.0]
         fixed_results = evaluate_at_fixed_frictions(
-            model, args.env, friction_values, 
-            n_episodes_per_friction=20, render=args.render
+            model, friction_values, 
+            n_episodes_per_friction=20, render=args.render,
+            use_friction_env=use_friction_env
         )
         
         print(f"\n{'='*40}")
@@ -254,4 +310,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
