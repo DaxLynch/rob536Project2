@@ -31,22 +31,101 @@ venv\Scripts\activate  # On Windows
 pip install -r requirements.txt
 ```
 
-Note: This installs `stable-baselines3[extra]` which includes additional dependencies. The `rl-zoo3` package is installed separately and provides the training framework and hyperparameters.
+**Note:** This installs:
+- `stable-baselines3[extra]` and `sb3-contrib`: Core RL algorithms (required for `train.py`)
+- `sbx-rl`: Jax-based implementations (optional, only needed for `trainSBX.py`)
+- `rl-zoo3`: Training framework and hyperparameters
+- `matplotlib`, `pandas`, `tensorboard`: Visualization and logging tools
+
+If your system has issues with `sbx-rl`, you can skip it and just use `train.py`.
 
 ## Training
 
+📘 **For detailed training instructions, monitoring, and visualization, see [TRAINING_GUIDE.md](TRAINING_GUIDE.md)**
+
 There are two ways to train agents:
 
-### Method 1: Using train.py Script
+### Method 1: Using Training Scripts (Recommended for Custom Training)
 
-The provided `train.py` script is set up to train a DDPG agent:
+We provide **two training scripts** with identical features but different implementations:
+
+#### Option A: `train.py` (Recommended - Full Logging)
+Uses **sb3_contrib** (PyTorch-based) with comprehensive tensorboard logging:
 
 ```bash
 source venv/bin/activate
 python train.py
 ```
 
-This trains a DDPG agent on the `PandaReach-v3` environment for 30,000 timesteps and saves the model as `panda_reach_ddpg`.
+**Pros:**
+- ✅ Full tensorboard metrics (actor_loss, critic_loss, ent_coef)
+- ✅ Better compatibility across systems
+- ✅ Standard implementation used in RL research
+- ✅ More mature and tested
+
+**Cons:**
+- Slightly slower than Jax-based version
+
+#### Option B: `trainSBX.py` (Experimental - Faster)
+Uses **sbx** (Jax-based) for potentially faster training:
+
+```bash
+source venv/bin/activate
+python trainSBX.py
+```
+
+**Pros:**
+- ✅ Faster training on some systems
+- ✅ Hardware acceleration with Jax
+
+**Cons:**
+- ⚠️ Limited tensorboard logging (no loss metrics)
+- ⚠️ May have compatibility issues on some systems
+- ⚠️ Requires additional dependencies (sbx-rl)
+
+**Recommendation:** Use `train.py` for research and full metrics. Use `trainSBX.py` only if you need maximum speed and don't require loss metrics.
+
+**Features:**
+- **Parallel Environments**: Uses 16 parallel environments for faster training
+- **Tensorboard Logging**: Real-time monitoring of losses, rewards, and other metrics
+- **Periodic Checkpoints**: Saves model every 50,000 steps
+- **Continuous Evaluation**: Evaluates model every 10,000 steps and saves best model
+- **Progress Bar**: Visual progress indicator during training
+- **Monitor Logs**: Episode statistics saved to CSV files
+
+**Output Structure:**
+```
+logs/
+└── tqc/
+    └── PandaReach-v3_YYYYMMDD_HHMMSS/
+        ├── 0.monitor.csv           # Training episode data
+        ├── best_model/             # Best model based on evaluation
+        ├── checkpoints/            # Periodic model checkpoints
+        ├── eval/                   # Evaluation logs
+        └── final_model.zip         # Final trained model
+```
+
+**Monitor Training in Real-Time:**
+```bash
+# In a separate terminal, run tensorboard
+tensorboard --logdir ./logs/tqc_tensorboard
+# Then open http://localhost:6006 in your browser
+```
+
+**Visualize Training Results:**
+```bash
+# After training, plot the results
+python plot_results.py --log-dir logs/tqc/PandaReach-v3_YYYYMMDD_HHMMSS
+```
+
+**Configuration:**
+Edit the configuration section at the top of `train.py`:
+```python
+N_ENVS = 16              # Number of parallel environments
+TOTAL_TIMESTEPS = 1_000_000  # Total training steps
+EVAL_FREQ = 10_000       # Evaluate every N steps
+SAVE_FREQ = 50_000       # Save checkpoint every N steps
+```
 
 You can modify `train.py` to use different algorithms or environments:
 
@@ -82,6 +161,54 @@ This method automatically saves models in the `logs/` directory with proper fold
 
 - **DDPG**: Trains quickly and has shown good performance on PandaReach-v3
 - **TQC**: A better version of SAC (Twin Quantile Critic), but may require more tuning for optimal performance
+
+### Speeding Up Training with Multiple CPU Cores
+
+You can significantly speed up training by using **vectorized environments** to train on multiple CPU cores in parallel. There are two main approaches:
+
+#### Method 1: Using train.py with Vectorized Environments
+
+The updated `train.py` script now supports parallel training. Simply adjust the `N_ENVS` variable:
+
+```python
+N_ENVS = 4  # Use 4 parallel environments (adjust based on your CPU cores)
+```
+
+**Options:**
+- **SubprocVecEnv**: True multiprocessing - uses multiple CPU cores (recommended for CPU-bound environments)
+- **DummyVecEnv**: Single-process vectorization - faster than single env but no multiprocessing
+
+**Example:**
+```bash
+python train.py  # Will use 4 parallel environments by default
+```
+
+**Performance Tips:**
+- Set `N_ENVS` to the number of CPU cores you have (e.g., 4, 8, 16)
+- With `N_ENVS` parallel environments, each training step collects `N_ENVS` experiences simultaneously
+- This can provide **near-linear speedup** (e.g., 4x faster with 4 environments)
+- Note: Total timesteps are shared across all environments, so training completes faster
+
+#### Method 2: Using RL Baselines3 Zoo with --n-jobs
+
+RL Baselines3 Zoo automatically uses vectorized environments when you specify `--n-jobs`:
+
+```bash
+# Train with 4 parallel environments
+python -m rl_zoo3.train --algo tqc --env PandaReach-v3 --n-jobs 4
+
+# Train with 8 parallel environments
+python -m rl_zoo3.train --algo ddpg --env PandaReach-v3 --n-jobs 8
+```
+
+**Benefits:**
+- Automatic environment vectorization
+- Pre-tuned hyperparameters (for supported environments)
+- Better logging and experiment management
+
+**References:**
+- [Stable-Baselines3 Vectorized Environments](https://stable-baselines3.readthedocs.io/en/master/guide/vec_envs.html)
+- [RL Baselines3 Zoo Training Guide](https://rl-baselines3-zoo.readthedocs.io/en/master/guide/train.html)
 
 ## Viewing the Trained Agent
 

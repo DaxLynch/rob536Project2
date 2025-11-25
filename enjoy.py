@@ -5,22 +5,14 @@ This script loads a trained model and displays the agent's behavior in the envir
 """
 import gymnasium as gym
 import panda_gym
-from sb3_contrib import TQC
-from stable_baselines3 import DDPG
+from sbx import TQC
 import time
 
 # Load the trained model
-"""
-model_path = "/home/dax/Code/ROB537/group_project/logs/tqc/PandaReach-v3_2/PandaReach-v3.zip"
+model_path = "./logs/tqc_sbx/PandaReach-v3_20251124_173555/best_model/best_model"
 print(f"Loading model from {model_path}...")
-env = gym.make("PandaReach-v3",     render_mode="human",renderer="OpenGL")
+env = gym.make("PandaReach-v3", render_mode="human", renderer="OpenGL")
 model = TQC.load(model_path, env=env)
-"""
-
-model_path = "DDPG-modelname-don'tincludethe.zipfileextension"
-print(f"Loading model from {model_path}...")
-model = DDPG.load(model_path)
-env = gym.make("PandaReach-v3",     render_mode="human",renderer="OpenGL")
 
 # Create the environment with rendering enabled
 
@@ -53,4 +45,6 @@ except KeyboardInterrupt:
 
 finally:
     env.close()
+
+
 

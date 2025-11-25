@@ -5,5 +5,6 @@ rl-zoo3
 matplotlib
 pandas
 tensorboard
-sbx-rl  # Stable-Baselines-Jax for faster training
+sb3-contrib
+sbx-rl  # Optional: Only needed for trainSBX.py (Jax-based, faster but limited logging)
 
