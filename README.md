@@ -357,3 +357,8 @@ python list_algorithms.py
 - [stable-baselines3 documentation](https://stable-baselines3.readthedocs.io/)
 - [RL Baselines3 Zoo GitHub](https://github.com/DLR-RM/rl-baselines3-zoo)
 - [panda-gym documentation](https://panda-gym.readthedocs.io/)
+
+pip install --upgrade "jax[cuda12]" 
+pip install --upgrade tfp-nightly
+
+This let me run sbx, gets 15 percent performance, plus seems to actually learn lol

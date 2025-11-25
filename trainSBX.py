@@ -29,8 +29,13 @@ SAVE_FREQ = 50_000  # Save checkpoint every N steps
 N_EVAL_EPISODES = 10  # Number of episodes for evaluation
 
 # Create timestamped log directory
+exp_name = None
+log_dir = None
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-log_dir = f"./logs/{ALGO_NAME}/{ENV_NAME}_{timestamp}"
+if exp_name is not None:
+    log_dir = f"./logs/{ALGO_NAME}/{ENV_NAME}_{exp_name}_{timestamp}"
+else:
+    log_dir = f"./logs/{ALGO_NAME}/{ENV_NAME}_{timestamp}"
 tensorboard_log = f"./logs/{ALGO_NAME}_tensorboard"
 os.makedirs(log_dir, exist_ok=True)
 
