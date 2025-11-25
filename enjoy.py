@@ -10,7 +10,7 @@ USE_PICK_AND_PLACE = True  # False = PandaReach, True = PandaPickAndPlace
 
 if USE_PICK_AND_PLACE:
     env_id = "PandaPickAndPlace-v3"
-    model_path = "/home/dax/Code/ROB537/group_project/logs/tqc_sbx/PandaPickAndPlace-v3_UsingTunedHyperParams3MSteps_20251125_022727/best_model/best_model"
+    model_path = "best_models/pick_and_place_end_effector_mode_std_friction"
 else:
     env_id = "PandaReach-v3"
     model_path = "./logs/tqc_sbx/PandaReach-v3_20251124_173555/best_model/best_model"
