@@ -1,0 +1,22 @@
+newFrictionEnvFirstTry_20251125_104704_1, this was the first attempt with the new friction env. 
+It works quite well at 700 it/s. So far the training is progressing exactly as the previous env did.
+I will see how performance compares between the two on the fixed env and the varying env.
+
+ PandaPickAndPlace-v3_20251125_022727_1  this is the best run on the pick and place. rewards and performance plateua
+ around 40 minute/2M steps mark. 
+
+ hypothesis, no magic sensor + varying friction should mean it treats every object like it is ice
+ which means it would probably be more delicate, and then lead to an improved 
+
+ make a mention of HER for paper padding. I think it helps with the sparse rewards of a long Trajectory
+ This is why HER is essential - with sparse rewards, random exploration almost never gets a positive signal. HER creates "fake" successes by relabeling achieved goals.
+
+
+ So future design paths:
+ Use the dense rewards
+ dont use HER
+ after computing the no magic sensor on varying friction, add different shapes
+ add objects
+ ADD WRIST MOTION, my current hypothesis is that if friction is too low you
+ would have to have some wrist motion.
+ Use a T shaped object, set friction to 0, you could only pick up from the bottom side.

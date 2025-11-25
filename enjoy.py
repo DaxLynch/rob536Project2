@@ -3,12 +3,15 @@ import gymnasium as gym
 import panda_gym
 from sbx import TQC
 import time
-
+import friction_env
 # ===== CHANGE THIS FLAG =====
 USE_PICK_AND_PLACE = True  # False = PandaReach, True = PandaPickAndPlace
 # ============================
-
-if USE_PICK_AND_PLACE:
+FRICTION_MODE = True
+if FRICTION_MODE:
+    env_id = "FrictionPickAndPlace-v1"
+    model_path = "best_models/pick_and_place_end_effector_friction_mode"
+elif USE_PICK_AND_PLACE:
     env_id = "PandaPickAndPlace-v3"
     model_path = "best_models/pick_and_place_end_effector_mode_std_friction"
 else:

@@ -32,7 +32,7 @@ import friction_env  # Registers FrictionPickAndPlace-v1, ConstantFrictionPickAn
 ENV_NAME = "FrictionPickAndPlace-v1"
 ALGO_NAME = "tqc_sbx"  # Using SBX (Jax-based) implementation
 N_ENVS = 24  # Number of parallel environments
-TOTAL_TIMESTEPS = 2_000_000
+TOTAL_TIMESTEPS = 3_000_000
 EVAL_FREQ = 10_000  # Evaluate every N steps (per environment)
 SAVE_FREQ = 50_000  # Save checkpoint every N steps
 N_EVAL_EPISODES = 10  # Number of episodes for evaluation
