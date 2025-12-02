@@ -156,12 +156,44 @@ class PickAndPlaceWithFriction(Task):
         d = distance(achieved_goal, desired_goal)
         return np.array(d < self.distance_threshold, dtype=bool)
 
+    '''
     def compute_reward(self, achieved_goal, desired_goal, info: Dict[str, Any]) -> np.ndarray:
         d = distance(achieved_goal, desired_goal)
         if self.reward_type == "sparse":
             return -np.array(d > self.distance_threshold, dtype=np.float32)
         else:
             return -d.astype(np.float32)
+    '''
+
+    def compute_reward(self, achieved_goal, desired_goal, info):
+        # Base dense reward
+        d = distance(achieved_goal, desired_goal)
+        if self.reward_type == "sparse":
+            reward = -np.array(d > self.distance_threshold, dtype=np.float32)
+        else:
+            reward = -d.astype(np.float32)
+
+        # === ADDITIONAL REWARD TERMS FOR LOW FRICTION ===
+
+        # 1. Object–Gripper Centering (MOST IMPORTANT)
+        obj_pos = np.array(self.sim.get_base_position("object"))
+        ee_pos  = np.array(self.sim.get_link_position("panda", self.robot.eef_link))
+        r_center = -1.0 * np.linalg.norm(obj_pos[:2] - ee_pos[:2])
+        reward += r_center
+
+        # 2. Slip Penalty (SECOND MOST IMPORTANT)
+        obj_vel = np.array(self.sim.get_base_velocity("object"))
+        ee_vel  = np.array(self.sim.get_link_velocity("panda", self.robot.eef_link))
+        r_slip = -0.15 * np.linalg.norm(obj_vel - ee_vel)
+        reward += r_slip
+
+        # 3. Optional: Grasp bonus
+        # detect gripping + slight lift
+        gripper_width = self.robot.gripper_width
+        if gripper_width < 0.03 and obj_pos[2] > self.object_size * 1.2:
+            reward += 1.0
+
+        return reward
 
 
 class FrictionPickAndPlaceEnv(RobotTaskEnv):
@@ -288,6 +320,4 @@ gym.register(
     entry_point="friction_env:ConstantFrictionPickAndPlaceEnv",
     max_episode_steps=50,
 )
-
-
 
