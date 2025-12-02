@@ -157,7 +157,7 @@ class PickAndPlaceWithFriction(Task):
         d = distance(achieved_goal, desired_goal)
         return np.array(d < self.distance_threshold, dtype=bool)
 
-    '''
+    
     def compute_reward(self, achieved_goal, desired_goal, info: Dict[str, Any]) -> np.ndarray:
         d = distance(achieved_goal, desired_goal)
         if self.reward_type == "sparse":
@@ -165,74 +165,86 @@ class PickAndPlaceWithFriction(Task):
         else:
             return -d.astype(np.float32)
     '''
-
     def compute_reward(self, achieved_goal, desired_goal, info):
+        """
+        HER-compatible reward with minimal, high-impact shaping for low-friction cases.
+        Returns float for single calls, np.array for vectorized HER calls (info=list).
+        """
+        # Vectorized HER case: info is a list of dicts
+        if isinstance(info, list):
+            out = []
+            for i in range(len(info)):
+                out.append(self._compute_single_reward(
+                    np.array(achieved_goal[i]),
+                    np.array(desired_goal[i]),
+                    info[i]
+                ))
+            return np.array(out, dtype=np.float32)
 
-        # ----- base sparse reward -----
+        # Single-call case
+        return float(self._compute_single_reward(np.array(achieved_goal), np.array(desired_goal), info))
+
+
+    def _compute_single_reward(self, achieved_goal, desired_goal, info):
+        """Internal single-step reward. Keep this compact and stable for TQC."""
+        # ---- 0) Base dense distance reward (stable learning signal) ----
         d = np.linalg.norm(achieved_goal - desired_goal)
-        reward = -d
+        reward = -1.0 * d  # primary objective: get object to goal
 
-        # ensure we have robot access
-        if not hasattr(self, "robot"):
+        # If robot not available (early init), return base reward
+        if not hasattr(self, "robot") or self.robot is None:
             return reward
 
-        # ----- robot measurements -----
-        ee_pos = self.robot.get_ee_position()
-        gripper_width = self.robot.get_fingers_width()
-        obj_pos = self.sim.get_base_position("object")
+        # ---- 1) State queries (safe calls) ----
+        try:
+            ee_pos = np.array(self.robot.get_ee_position())        # (3,)
+        except Exception:
+            ee_pos = np.array(self.sim.get_link_position("panda", 11))  # fallback to link index 11
 
-        # how centered the object is between fingertips
-        # smaller = better
-        center_offset = np.linalg.norm(ee_pos[:2] - obj_pos[:2])
+        gripper_width = float(self.robot.get_fingers_width())     # smaller = closed
+        obj_pos = np.array(self.sim.get_base_position("object"))
+        obj_vel = np.array(self.sim.get_base_velocity("object")[0])  # (3,)
+        # try to get ee vel, fallback to zeros if unavailable
+        try:
+            ee_vel = np.array(self.robot.get_ee_velocity())
+        except Exception:
+            ee_vel = np.zeros(3)
 
-        # friction value used this episode
-        mu = self.current_friction
+        mu = float(self.current_friction) if hasattr(self, "current_friction") else 0.5
 
+        # ---- 2) Centering (high impact for low friction) ----
+        xy_offset = np.linalg.norm((ee_pos[:2] - obj_pos[:2]))
+        # reward EE being above object; stronger when mu is small
+        centering_scale = 1.0 + (0.25 - mu) * 6.0 if mu < 0.25 else 1.0
+        centering_bonus = max(0.0, 0.04 - xy_offset) * 20.0 * centering_scale
+        reward += centering_bonus
 
-        # ======================================================
-        # 1. SQUEEZE BONUS (for low friction)
-        # ======================================================
-        # Encourage tighter grasp when friction is low
-        squeeze_bonus = 0.0
-        if mu < 0.25:
-            target_width = 0.03    # slightly closed
-            squeeze_bonus = 3.0 * max(0, (target_width - gripper_width))
-            reward += squeeze_bonus
+        # ---- 3) Squeeze bonus (encourage closing when close) ----
+        close_dist = np.linalg.norm(ee_pos - obj_pos)
+        if close_dist < 0.08:   # only encourage squeezing when near the object
+            target_width = 0.03
+            squeeze = max(0.0, (target_width - gripper_width))
+            squeeze_scale = 1.0 + (0.25 - mu) * 4.0 if mu < 0.25 else 1.0
+            reward += 6.0 * squeeze * squeeze_scale
 
+        # ---- 4) Slip penalty (obj vs ee relative velocity) ----
+        rel_vel = np.linalg.norm(obj_vel - ee_vel)
+        slip_scale = (0.25 / max(mu, 1e-3)) if mu < 0.25 else 1.0
+        reward -= 1.5 * rel_vel * slip_scale
 
-        # ======================================================
-        # 2. STABILITY REWARD (keep object centered)
-        # ======================================================
-        # Strong incentive for low μ
-        stability_bonus = max(0, 0.02 - center_offset)
-        reward += (1.0 + (0.25 - mu) * 10.0) * stability_bonus if mu < 0.25 else stability_bonus
+        # ---- 5) Small per-step penalty to discourage long sliding episodes ----
+        reward -= 0.01
 
-
-        # ======================================================
-        # 3. LIFT VELOCITY PENALTY
-        # ======================================================
-        obj_vel = np.linalg.norm(self.sim.get_base_velocity("object")[0])
-        if mu < 0.20:
-            # penalize moving while object is not secured
-            reward -= 0.2 * obj_vel * (0.20 - mu) * 10.0
-
-
-        # ======================================================
-        # 4. HOLD TIME BONUS (reward consistent gripping)
-        # ======================================================
-        if info.get("is_success", False):
-            # reward multiple timesteps when holding object to reinforce stable grasp
+        # ---- 6) Success bonuses (clear credit assignment) ----
+        success = info.get("is_success", False)
+        if success:
             reward += 5.0
+            if mu < 0.15:
+                reward += 8.0   # extra incentive to solve the hardest friction cases
 
-
-        # ======================================================
-        # 5. EXTRA SUCCESS BONUS FOR LOW FRICTION
-        # ======================================================
-        if info.get("is_success", False) and mu < 0.15:
-            reward += 10.0       # big bonus for mastering the hard cases
-
-        return float(reward)
-
+        # Finally, clip reward to a reasonable range for stability
+        return float(np.clip(reward, -100.0, 100.0))
+'''
 
 class FrictionPickAndPlaceEnv(RobotTaskEnv):
     """Pick and Place task with friction randomization.
@@ -360,3 +372,11 @@ gym.register(
     max_episode_steps=50,
 )
 
+# Curriculum for low friction based off of model trained w/ varying fric and awareness
+# Constant friction with friction in obs (for pre-training friction-aware models)
+gym.register(
+    id="CurriculumFrictionPickAndPlace-v1",
+    entry_point="friction_env:ConstantFrictionPickAndPlaceEnv",
+    max_episode_steps=50,
+    kwargs={"friction_range" : (0.05, 0.25)},
+)

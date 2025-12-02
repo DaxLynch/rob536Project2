@@ -39,7 +39,7 @@ SAVE_FREQ = 50_000  # Save checkpoint every N steps
 N_EVAL_EPISODES = 10  # Number of episodes for evaluation
 
 # Create timestamped log directory
-exp_name = "nonFrictionAware-VaryingFrictionFirstTry"
+exp_name = "friction_w_friction_v1"
 log_dir = None
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 if exp_name is not None:
@@ -109,23 +109,51 @@ callbacks = CallbackList([checkpoint_callback, eval_callback])
 # ============================================================================
 # Create the TQC model with tensorboard logging
 # And update the model creation section (around lines 100-106):
-model = TQC(
-    policy="MultiInputPolicy",
-    env=env,
-    learning_rate=0.001,
-    buffer_size=1_000_000,
-    batch_size=2048*2,
-    gamma=0.95,
-    tau=0.05,
-    train_freq=16,
-    gradient_steps=16,
-    replay_buffer_class=HerReplayBuffer,
-    replay_buffer_kwargs=dict(goal_selection_strategy='future', n_sampled_goal=4),
-    policy_kwargs=dict(net_arch=[512, 512, 512], n_critics=2),
-    verbose=1,
-    tensorboard_log=tensorboard_log,
-    device="cuda",
-)
+
+LOAD_PRETRAINED = True       # <--- set to False to train from scratch
+USE_PICK_AND_PLACE = True
+FRICTION_MODE = True
+
+# Select environment and model path
+if FRICTION_MODE:
+    env_id = "FrictionPickAndPlace-v1"
+    model_path = "best_models/pick_and_place_friction_friction_jamie.zip"
+elif USE_PICK_AND_PLACE:
+    env_id = "PandaPickAndPlace-v3"
+    model_path = "best_models/pick_and_place_end_effector_mode_std_friction"
+else:
+    env_id = "PandaReach-v3"
+    model_path = "best_models/panda_reach_end_effector_std_friction"
+
+print(f"Creating env {env_id}...")
+env = gym.make(env_id)
+# ---------------------------------------------------------
+# Load the model OR create a fresh TQC
+# ---------------------------------------------------------
+if LOAD_PRETRAINED:
+    print(f"Loading pretrained TQC model from: {model_path}")
+    model = TQC.load(model_path, env=env)
+else:
+    print("Creating new TQC model...")
+    model = TQC(
+        policy="MultiInputPolicy",
+        env=env,
+        learning_rate=0.001,
+        buffer_size=1_000_000,
+        batch_size=2048*2,
+        gamma=0.95,
+        tau=0.05,
+        train_freq=16,
+        gradient_steps=16,
+        replay_buffer_class=HerReplayBuffer,
+        replay_buffer_kwargs=dict(goal_selection_strategy='future', n_sampled_goal=4),
+        policy_kwargs=dict(net_arch=[512, 512, 512], n_critics=2),
+        verbose=1,
+        tensorboard_log=tensorboard_log,
+        device="cuda",
+        learning_starts=2000,
+    )
+
 
 # Train the agent
 print("\n" + "=" * 80)
@@ -148,7 +176,7 @@ print("=" * 80)
 # ============================================================================
 # Save Final Model
 # ============================================================================
-final_model_path = f"{log_dir}/final_model"
+final_model_path = f"{log_dir}/final_model_reward"
 model.save(final_model_path)
 print(f"\nFinal model saved to: {final_model_path}")
 print(f"Best model saved to: {log_dir}/best_model")
