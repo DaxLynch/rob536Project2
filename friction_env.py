@@ -49,6 +49,7 @@ class PickAndPlaceWithFriction(Task):
         friction_in_obs: bool = True,
     ) -> None:
         super().__init__(sim)
+        self.robot = None
         self.reward_type = reward_type
         self.distance_threshold = distance_threshold
         self.object_size = 0.04
@@ -166,34 +167,71 @@ class PickAndPlaceWithFriction(Task):
     '''
 
     def compute_reward(self, achieved_goal, desired_goal, info):
-        # Base dense reward
-        d = distance(achieved_goal, desired_goal)
-        if self.reward_type == "sparse":
-            reward = -np.array(d > self.distance_threshold, dtype=np.float32)
-        else:
-            reward = -d.astype(np.float32)
 
-        # === ADDITIONAL REWARD TERMS FOR LOW FRICTION ===
+        # ----- base sparse reward -----
+        d = np.linalg.norm(achieved_goal - desired_goal)
+        reward = -d
 
-        # 1. Object–Gripper Centering (MOST IMPORTANT)
-        obj_pos = np.array(self.sim.get_base_position("object"))
-        ee_pos  = np.array(self.sim.get_link_position("panda", self.robot.eef_link))
-        r_center = -1.0 * np.linalg.norm(obj_pos[:2] - ee_pos[:2])
-        reward += r_center
+        # ensure we have robot access
+        if not hasattr(self, "robot"):
+            return reward
 
-        # 2. Slip Penalty (SECOND MOST IMPORTANT)
-        obj_vel = np.array(self.sim.get_base_velocity("object"))
-        ee_vel  = np.array(self.sim.get_link_velocity("panda", self.robot.eef_link))
-        r_slip = -0.15 * np.linalg.norm(obj_vel - ee_vel)
-        reward += r_slip
+        # ----- robot measurements -----
+        ee_pos = self.robot.get_ee_position()
+        gripper_width = self.robot.get_fingers_width()
+        obj_pos = self.sim.get_base_position("object")
 
-        # 3. Optional: Grasp bonus
-        # detect gripping + slight lift
-        gripper_width = self.robot.gripper_width
-        if gripper_width < 0.03 and obj_pos[2] > self.object_size * 1.2:
-            reward += 1.0
+        # how centered the object is between fingertips
+        # smaller = better
+        center_offset = np.linalg.norm(ee_pos[:2] - obj_pos[:2])
 
-        return reward
+        # friction value used this episode
+        mu = self.current_friction
+
+
+        # ======================================================
+        # 1. SQUEEZE BONUS (for low friction)
+        # ======================================================
+        # Encourage tighter grasp when friction is low
+        squeeze_bonus = 0.0
+        if mu < 0.25:
+            target_width = 0.03    # slightly closed
+            squeeze_bonus = 3.0 * max(0, (target_width - gripper_width))
+            reward += squeeze_bonus
+
+
+        # ======================================================
+        # 2. STABILITY REWARD (keep object centered)
+        # ======================================================
+        # Strong incentive for low μ
+        stability_bonus = max(0, 0.02 - center_offset)
+        reward += (1.0 + (0.25 - mu) * 10.0) * stability_bonus if mu < 0.25 else stability_bonus
+
+
+        # ======================================================
+        # 3. LIFT VELOCITY PENALTY
+        # ======================================================
+        obj_vel = np.linalg.norm(self.sim.get_base_velocity("object")[0])
+        if mu < 0.20:
+            # penalize moving while object is not secured
+            reward -= 0.2 * obj_vel * (0.20 - mu) * 10.0
+
+
+        # ======================================================
+        # 4. HOLD TIME BONUS (reward consistent gripping)
+        # ======================================================
+        if info.get("is_success", False):
+            # reward multiple timesteps when holding object to reinforce stable grasp
+            reward += 5.0
+
+
+        # ======================================================
+        # 5. EXTRA SUCCESS BONUS FOR LOW FRICTION
+        # ======================================================
+        if info.get("is_success", False) and mu < 0.15:
+            reward += 10.0       # big bonus for mastering the hard cases
+
+        return float(reward)
 
 
 class FrictionPickAndPlaceEnv(RobotTaskEnv):
@@ -238,6 +276,7 @@ class FrictionPickAndPlaceEnv(RobotTaskEnv):
             randomize_friction=randomize_friction,
             friction_in_obs=friction_in_obs,
         )
+        task.robot = robot
         super().__init__(
             robot,
             task,
