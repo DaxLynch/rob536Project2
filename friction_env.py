@@ -22,17 +22,18 @@ from panda_gym.utils import distance
 #just converted it to a native environment. and this had much better performance.
 
 class PickAndPlaceWithFriction(Task):
-    """Pick and Place task with friction as part of the observation.
+    """Pick and Place task with friction randomization.
     
     This task extends the standard PickAndPlace by:
     - Randomizing object friction on each reset
-    - Including friction value in the observation array
+    - Optionally including friction value in the observation array
     
     Args:
         sim: PyBullet simulation instance
         reward_type: "sparse" or "dense"
         friction_range: Tuple of (min, max) friction values
         randomize_friction: If True, randomize friction each reset. If False, use middle of range.
+        friction_in_obs: If True, include friction in observation (20 dims). If False, hide it (19 dims).
     """
     
     def __init__(
@@ -45,6 +46,7 @@ class PickAndPlaceWithFriction(Task):
         obj_xy_range: float = 0.3,
         friction_range: tuple = (0.05, 2.0),
         randomize_friction: bool = True,
+        friction_in_obs: bool = True,
     ) -> None:
         super().__init__(sim)
         self.reward_type = reward_type
@@ -58,6 +60,7 @@ class PickAndPlaceWithFriction(Task):
         # Friction configuration
         self.friction_min, self.friction_max = friction_range
         self.randomize_friction = randomize_friction
+        self.friction_in_obs = friction_in_obs
         self.current_friction = (self.friction_min + self.friction_max) / 2  # Default to middle
         
         with self.sim.no_rendering():
@@ -84,21 +87,30 @@ class PickAndPlaceWithFriction(Task):
         )
 
     def get_obs(self) -> np.ndarray:
-        """Return observation including friction value."""
+        """Return observation, optionally including friction value."""
         # Original observations: position, rotation, velocity, angular velocity of object
         object_position = self.sim.get_base_position("object")
         object_rotation = self.sim.get_base_rotation("object")
         object_velocity = self.sim.get_base_velocity("object")
         object_angular_velocity = self.sim.get_base_angular_velocity("object")
         
-        # Append friction to observation (11 floats total instead of 10)
-        observation = np.concatenate([
-            object_position, 
-            object_rotation, 
-            object_velocity, 
-            object_angular_velocity,
-            [self.current_friction]  # Friction as the last element
-        ])
+        if self.friction_in_obs:
+            # Include friction (11 floats from task, 20 total with robot)
+            observation = np.concatenate([
+                object_position, 
+                object_rotation, 
+                object_velocity, 
+                object_angular_velocity,
+                [self.current_friction]
+            ])
+        else:
+            # Hide friction (10 floats from task, 19 total with robot - same as vanilla)
+            observation = np.concatenate([
+                object_position, 
+                object_rotation, 
+                object_velocity, 
+                object_angular_velocity,
+            ])
         return observation
 
     def get_achieved_goal(self) -> np.ndarray:
@@ -155,8 +167,8 @@ class PickAndPlaceWithFriction(Task):
 class FrictionPickAndPlaceEnv(RobotTaskEnv):
     """Pick and Place task with friction randomization.
     
-    The friction value is included in the observation space and randomized
-    each episode. This is a native implementation that avoids wrapper overhead.
+    The friction value can optionally be included in the observation space.
+    Friction is randomized each episode. Native implementation avoids wrapper overhead.
     
     Args:
         render_mode: Render mode ("rgb_array" or "human")
@@ -164,6 +176,7 @@ class FrictionPickAndPlaceEnv(RobotTaskEnv):
         control_type: "ee" (end-effector) or "joints"
         friction_range: Tuple of (min, max) friction values
         randomize_friction: If True, randomize friction each reset
+        friction_in_obs: If True, include friction in obs (20 dims). If False, hide it (19 dims).
         renderer: "Tiny" or "OpenGL"
     """
 
@@ -174,6 +187,7 @@ class FrictionPickAndPlaceEnv(RobotTaskEnv):
         control_type: str = "ee",
         friction_range: tuple = (0.1, 2.0),
         randomize_friction: bool = True,
+        friction_in_obs: bool = True,
         renderer: str = "Tiny",
         render_width: int = 720,
         render_height: int = 480,
@@ -190,6 +204,7 @@ class FrictionPickAndPlaceEnv(RobotTaskEnv):
             reward_type=reward_type,
             friction_range=friction_range,
             randomize_friction=randomize_friction,
+            friction_in_obs=friction_in_obs,
         )
         super().__init__(
             robot,
@@ -250,12 +265,24 @@ class ConstantFrictionPickAndPlaceEnv(FrictionPickAndPlaceEnv):
 
 
 # Register environments with gymnasium
+
+# Friction-aware: agent sees friction in observation (20 dims)
 gym.register(
     id="FrictionPickAndPlace-v1",
     entry_point="friction_env:FrictionPickAndPlaceEnv",
     max_episode_steps=50,
 )
 
+# Blind friction: agent does NOT see friction (19 dims, same as vanilla)
+# but friction still varies each episode (domain randomization)
+gym.register(
+    id="BlindFrictionPickAndPlace-v1",
+    entry_point="friction_env:FrictionPickAndPlaceEnv",
+    max_episode_steps=50,
+    kwargs={"friction_in_obs": False},
+)
+
+# Constant friction with friction in obs (for pre-training friction-aware models)
 gym.register(
     id="ConstantFrictionPickAndPlace-v1",
     entry_point="friction_env:ConstantFrictionPickAndPlaceEnv",

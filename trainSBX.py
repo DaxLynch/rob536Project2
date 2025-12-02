@@ -29,7 +29,7 @@ import friction_env  # Registers FrictionPickAndPlace-v1, ConstantFrictionPickAn
 #   "PandaPickAndPlace-v3"           - Standard (no friction in obs)
 #   "FrictionPickAndPlace-v1"        - Random friction each episode (native, fast)
 #   "ConstantFrictionPickAndPlace-v1" - Fixed friction=0.5 (for pre-training)
-ENV_NAME = "FrictionPickAndPlace-v1"
+ENV_NAME = "BlindFrictionPickAndPlace-v1"
 ALGO_NAME = "tqc_sbx"  # Using SBX (Jax-based) implementation
 N_ENVS = 24  # Number of parallel environments
 TOTAL_TIMESTEPS = 3_000_000
@@ -38,7 +38,7 @@ SAVE_FREQ = 50_000  # Save checkpoint every N steps
 N_EVAL_EPISODES = 10  # Number of episodes for evaluation
 
 # Create timestamped log directory
-exp_name = "newFrictionEnvFirstTry"
+exp_name = "nonFrictionAwareVaryingFrictionFirstTry"
 log_dir = None
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 if exp_name is not None:

@@ -13,3 +13,5 @@ Two types of CSV files:
    - Columns: friction, success_rate, mean_reward, std_reward, mean_length
    - Aggregated stats from 20 episodes per friction value
 
+
+

@@ -20,3 +20,8 @@ I will see how performance compares between the two on the fixed env and the var
  ADD WRIST MOTION, my current hypothesis is that if friction is too low you
  would have to have some wrist motion.
  Use a T shaped object, set friction to 0, you could only pick up from the bottom side.
+
+ trainging on with the magic sensor, on the varying friction environment, it converged
+ a full million time steps early, all hyperparameters the same.
+ Now I will train vanilla
+ 
