@@ -378,5 +378,5 @@ gym.register(
     id="CurriculumFrictionPickAndPlace-v1",
     entry_point="friction_env:ConstantFrictionPickAndPlaceEnv",
     max_episode_steps=50,
-    kwargs={"friction_range" : (0.05, 0.25)},
+    kwargs={"friction_range" : (0.25, 0.5)},
 )
