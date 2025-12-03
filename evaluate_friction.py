@@ -4,12 +4,13 @@ Evaluate a trained model's performance across varying friction levels.
 This script tests how well a model performs when the target object has 
 different friction coefficients.
 
-Supports both:
-- Models trained on FrictionPickAndPlace-v1 (20-dim obs with friction)
-- Models trained on PandaPickAndPlace-v3 (19-dim obs, no friction)
+Supports:
+- End-effector control (4-dim action) or joints control (7-dim action)
+- Friction-aware (20-dim obs) or standard (19-dim obs)
 
 Usage:
     python evaluate_friction.py --model path/to/model.zip
+    python evaluate_friction.py --model path/to/model.zip --control joints
     python evaluate_friction.py --model path/to/model.zip --episodes 50 --render
 """
 import argparse
@@ -28,7 +29,8 @@ import friction_env
 
 def evaluate_with_random_friction(model, n_episodes: int = 100, 
                                    render: bool = False,
-                                   use_friction_env: bool = True) -> dict:
+                                   use_friction_env: bool = True,
+                                   control_type: str = "ee") -> dict:
     """
     Evaluate model with random friction each episode.
     
@@ -36,16 +38,18 @@ def evaluate_with_random_friction(model, n_episodes: int = 100,
         model: Trained model
         n_episodes: Number of episodes to run
         render: Whether to render
-        use_friction_env: If True, use FrictionPickAndPlace-v1 (for friction-aware models)
-                         If False, use PandaPickAndPlace-v3 and manually set friction
+        use_friction_env: If True, use friction env (friction-aware models)
+                         If False, use standard env and manually set friction
+        control_type: "ee" for end-effector, "joints" for joint control
     
     Returns:
         Dictionary with results including success rate, rewards, and friction values
     """
-    if use_friction_env:
-        env_name = "FrictionPickAndPlace-v1"
+    # Select environment based on control type and friction awareness
+    if control_type == "joints":
+        env_name = "FrictionPickAndPlaceJoints-v1" if use_friction_env else "PandaPickAndPlaceJoints-v3"
     else:
-        env_name = "PandaPickAndPlace-v3"
+        env_name = "FrictionPickAndPlace-v1" if use_friction_env else "PandaPickAndPlace-v3"
     
     if render:
         env = gym.make(env_name, render_mode="human", renderer="OpenGL")
@@ -102,7 +106,8 @@ def evaluate_with_random_friction(model, n_episodes: int = 100,
 def evaluate_at_fixed_frictions(model, friction_values: list,
                                  n_episodes_per_friction: int = 20,
                                  render: bool = False,
-                                 use_friction_env: bool = True) -> dict:
+                                 use_friction_env: bool = True,
+                                 control_type: str = "ee") -> dict:
     """
     Evaluate model at specific friction values.
     
@@ -111,8 +116,9 @@ def evaluate_at_fixed_frictions(model, friction_values: list,
         friction_values: List of friction values to test
         n_episodes_per_friction: Episodes per friction level
         render: Whether to render
-        use_friction_env: If True, use FrictionPickAndPlace-v1 (for friction-aware models)
-                         If False, use PandaPickAndPlace-v3 and manually set friction
+        use_friction_env: If True, use friction env (friction-aware models)
+                         If False, use standard env and manually set friction
+        control_type: "ee" for end-effector, "joints" for joint control
     
     Returns:
         Dictionary with results grouped by friction level
@@ -126,25 +132,33 @@ def evaluate_at_fixed_frictions(model, friction_values: list,
         'mean_lengths': []
     }
     
+    # Select environment based on control type
+    if control_type == "joints":
+        friction_env_name = "FrictionPickAndPlaceJoints-v1"
+        standard_env_name = "PandaPickAndPlaceJoints-v3"
+    else:
+        friction_env_name = "FrictionPickAndPlace-v1"
+        standard_env_name = "PandaPickAndPlace-v3"
+    
     for friction in friction_values:
         if use_friction_env:
             # Use native friction env with fixed friction
             if render:
-                env = gym.make("FrictionPickAndPlace-v1", 
+                env = gym.make(friction_env_name, 
                               render_mode="human", 
                               renderer="OpenGL",
                               friction_range=(friction, friction),
                               randomize_friction=False)
             else:
-                env = gym.make("FrictionPickAndPlace-v1",
+                env = gym.make(friction_env_name,
                               friction_range=(friction, friction),
                               randomize_friction=False)
         else:
             # Use standard env, will manually set friction
             if render:
-                env = gym.make("PandaPickAndPlace-v3", render_mode="human", renderer="OpenGL")
+                env = gym.make(standard_env_name, render_mode="human", renderer="OpenGL")
             else:
-                env = gym.make("PandaPickAndPlace-v3")
+                env = gym.make(standard_env_name)
         
         rewards = []
         successes = []
@@ -234,6 +248,8 @@ def main():
                         help='Render the environment')
     parser.add_argument('--mode', type=str, default='random', choices=['random', 'fixed', 'both'],
                         help='Evaluation mode: random (varying each episode), fixed (test specific values), or both')
+    parser.add_argument('--control', type=str, default='ee', choices=['ee', 'joints'],
+                        help='Control type: ee (end-effector, 4-dim action) or joints (7-dim action)')
     parser.add_argument('--output-dir', type=str, default='./friction_eval_results',
                         help='Output directory for results')
     
@@ -241,23 +257,32 @@ def main():
     
     # Detect model type by trying to load with each env type
     print(f"Loading model from: {args.model}")
+    print(f"  Control type: {args.control}")
     
-    # First try FrictionPickAndPlace-v1 (20-dim obs)
+    # Select environments based on control type
+    if args.control == "joints":
+        friction_env_name = "FrictionPickAndPlaceJoints-v1"
+        standard_env_name = "PandaPickAndPlaceJoints-v3"
+    else:
+        friction_env_name = "FrictionPickAndPlace-v1"
+        standard_env_name = "PandaPickAndPlace-v3"
+    
+    # First try friction env (20-dim obs)
     try:
-        temp_env = gym.make("FrictionPickAndPlace-v1")
+        temp_env = gym.make(friction_env_name)
         model = TQC.load(args.model, env=temp_env)
         temp_env.close()
         use_friction_env = True
-        env_name = "FrictionPickAndPlace-v1"
-        print("  Model type: Friction-aware (20-dim observation)")
+        env_name = friction_env_name
+        print(f"  Model type: Friction-aware (20-dim observation)")
     except ValueError:
-        # Fall back to PandaPickAndPlace-v3 (19-dim obs)
-        temp_env = gym.make("PandaPickAndPlace-v3")
+        # Fall back to standard env (19-dim obs)
+        temp_env = gym.make(standard_env_name)
         model = TQC.load(args.model, env=temp_env)
         temp_env.close()
         use_friction_env = False
-        env_name = "PandaPickAndPlace-v3"
-        print("  Model type: Standard (19-dim observation, friction NOT in obs)")
+        env_name = standard_env_name
+        print(f"  Model type: Standard (19-dim observation, friction NOT in obs)")
     
     # Create output directory
     os.makedirs(args.output_dir, exist_ok=True)
@@ -273,7 +298,7 @@ def main():
     if args.mode in ['random', 'both']:
         print("\n--- Random Friction Evaluation ---\n")
         random_results = evaluate_with_random_friction(
-            model, args.episodes, args.render, use_friction_env
+            model, args.episodes, args.render, use_friction_env, args.control
         )
         
         # Summary
@@ -295,7 +320,7 @@ def main():
         fixed_results = evaluate_at_fixed_frictions(
             model, friction_values, 
             n_episodes_per_friction=20, render=args.render,
-            use_friction_env=use_friction_env
+            use_friction_env=use_friction_env, control_type=args.control
         )
         
         print(f"\n{'='*40}")

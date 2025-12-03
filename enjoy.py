@@ -4,17 +4,22 @@ import panda_gym
 from sbx import TQC
 import time
 import friction_env
-# ===== CHANGE THIS FLAG =====
-USE_PICK_AND_PLACE = True  # False = PandaReach, True = PandaPickAndPlace
-# ============================
-FRICTION_MODE = True
-if FRICTION_MODE:
+
+# ===== CHANGE THESE FLAGS =====
+# Options: "reach", "pick_ee", "pick_ee_friction", "pick_joints_friction"
+MODE = "pick_ee"
+# ==============================
+
+if MODE == "pick_joints_friction":
+    env_id = "ConstantFrictionPickAndPlaceJoints-v1"
+    model_path = "best_models/constant_friction_joints_mode"
+elif MODE == "pick_ee_friction":
     env_id = "FrictionPickAndPlace-v1"
     model_path = "best_models/pick_and_place_end_effector_friction_mode"
-elif USE_PICK_AND_PLACE:
+elif MODE == "pick_ee":
     env_id = "PandaPickAndPlace-v3"
     model_path = "best_models/pick_and_place_end_effector_mode_std_friction"
-else:
+else:  # reach
     env_id = "PandaReach-v3"
     model_path = "best_models/panda_reach_end_effector_std_friction"
 

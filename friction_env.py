@@ -290,4 +290,81 @@ gym.register(
 )
 
 
+# ==================== DENSE REWARD VARIANTS ====================
+# Dense rewards: -distance (continuous signal) vs sparse: -1/0 (binary)
+
+# Dense friction-aware: agent sees friction + gets continuous reward
+gym.register(
+    id="FrictionPickAndPlaceDense-v1",
+    entry_point="friction_env:FrictionPickAndPlaceEnv",
+    max_episode_steps=50,
+    kwargs={"reward_type": "dense"},
+)
+
+# Dense blind friction: domain randomization + continuous reward
+gym.register(
+    id="BlindFrictionPickAndPlaceDense-v1",
+    entry_point="friction_env:FrictionPickAndPlaceEnv",
+    max_episode_steps=50,
+    kwargs={"friction_in_obs": False, "reward_type": "dense"},
+)
+
+# Dense constant friction (for pre-training)
+gym.register(
+    id="ConstantFrictionPickAndPlaceDense-v1",
+    entry_point="friction_env:ConstantFrictionPickAndPlaceEnv",
+    max_episode_steps=50,
+    kwargs={"reward_type": "dense"},
+)
+
+
+
+# ==================== JOINTS CONTROL VARIANTS ====================
+# Joint control: action is 8D (7 joint velocities + gripper) instead of 4D (ee displacement)
+
+# Sparse + Joints
+gym.register(
+    id="FrictionPickAndPlaceJoints-v1",
+    entry_point="friction_env:FrictionPickAndPlaceEnv",
+    max_episode_steps=50,
+    kwargs={"control_type": "joints"},
+)
+
+gym.register(
+    id="BlindFrictionPickAndPlaceJoints-v1",
+    entry_point="friction_env:FrictionPickAndPlaceEnv",
+    max_episode_steps=50,
+    kwargs={"control_type": "joints", "friction_in_obs": False},
+)
+
+gym.register(
+    id="ConstantFrictionPickAndPlaceJoints-v1",
+    entry_point="friction_env:ConstantFrictionPickAndPlaceEnv",
+    max_episode_steps=50,
+    kwargs={"control_type": "joints"},
+)
+
+# Dense + Joints
+gym.register(
+    id="FrictionPickAndPlaceJointsDense-v1",
+    entry_point="friction_env:FrictionPickAndPlaceEnv",
+    max_episode_steps=50,
+    kwargs={"control_type": "joints", "reward_type": "dense"},
+)
+
+gym.register(
+    id="BlindFrictionPickAndPlaceJointsDense-v1",
+    entry_point="friction_env:FrictionPickAndPlaceEnv",
+    max_episode_steps=50,
+    kwargs={"control_type": "joints", "friction_in_obs": False, "reward_type": "dense"},
+)
+
+gym.register(
+    id="ConstantFrictionPickAndPlaceJointsDense-v1",
+    entry_point="friction_env:ConstantFrictionPickAndPlaceEnv",
+    max_episode_steps=50,
+    kwargs={"control_type": "joints", "reward_type": "dense"},
+)
+
+
 
