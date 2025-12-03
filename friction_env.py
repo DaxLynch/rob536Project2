@@ -376,7 +376,7 @@ gym.register(
 # Constant friction with friction in obs (for pre-training friction-aware models)
 gym.register(
     id="CurriculumFrictionPickAndPlace-v1",
-    entry_point="friction_env:ConstantFrictionPickAndPlaceEnv",
+    entry_point="friction_env:FrictionPickAndPlaceEnv",
     max_episode_steps=50,
-    kwargs={"friction_range" : (0.25, 0.5)},
+    kwargs={"friction_range" : (0.05, 0.25)},
 )

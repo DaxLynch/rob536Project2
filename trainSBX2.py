@@ -30,16 +30,17 @@ import friction_env  # Registers FrictionPickAndPlace-v1, ConstantFrictionPickAn
 #   "FrictionPickAndPlace-v1"        - Random friction each episode (native, fast)
 #   "ConstantFrictionPickAndPlace-v1" - Fixed friction=0.5 (for pre-training)
 #   "BlindFrictionPickAndPlace-v1"    - Blind friction pick and place (no friction in obs)
-ENV_NAME = "FrictionPickAndPlace-v1"
+ENV_NAME = "CurriculumFrictionPickAndPlace-v1"
 ALGO_NAME = "tqc_sbx"  # Using SBX (Jax-based) implementation
 N_ENVS = 24  # Number of parallel environments
-TOTAL_TIMESTEPS = 3_000_000
+TOTAL_TIMESTEPS = 250_000
+#TOTAL_TIMESTEPS = 3_000_000
 EVAL_FREQ = 10_000  # Evaluate every N steps (per environment)
 SAVE_FREQ = 50_000  # Save checkpoint every N steps
 N_EVAL_EPISODES = 10  # Number of episodes for evaluation
 
 # Create timestamped log directory
-exp_name = "curriculum_friction_w_friction_025_05"
+exp_name = "curriculum_friction_w_friction_05_25_250k"
 log_dir = None
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 if exp_name is not None:
@@ -125,8 +126,7 @@ else:
     env_id = "PandaReach-v3"
     model_path = "best_models/panda_reach_end_effector_std_friction"
 
-print(f"Creating env {env_id}...")
-env = gym.make(env_id)
+
 # ---------------------------------------------------------
 # Load the model OR create a fresh TQC
 # ---------------------------------------------------------
