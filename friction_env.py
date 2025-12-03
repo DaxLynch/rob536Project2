@@ -366,5 +366,11 @@ gym.register(
     kwargs={"control_type": "joints", "reward_type": "dense"},
 )
 
-
-
+# Curriculum for low friction based off of model trained w/ varying fric and awareness
+# Constant friction with friction in obs (for pre-training friction-aware models)
+gym.register(
+    id="CurriculumFrictionPickAndPlace-v1",
+    entry_point="friction_env:FrictionPickAndPlaceEnv",
+    max_episode_steps=50,
+    kwargs={"friction_range" : (0.05, 0.25)},
+)
